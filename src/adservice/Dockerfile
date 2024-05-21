@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM eclipse-temurin:19@sha256:17e3d3b61ca4a7606490f596feb77f69980939fecacf91a1f13ea7b17147058f as builder
+FROM eclipse-temurin:21@sha256:17f4e7fc9aedb22147ff7271b1fac98a5b0e5daf003183610b466fbcce17095a as builder
 
 WORKDIR /app
 
@@ -25,25 +25,19 @@ COPY . .
 RUN chmod +x gradlew
 RUN ./gradlew installDist
 
-FROM eclipse-temurin:19.0.1_10-jre-alpine@sha256:1aa167ab4f1498130e04bed5d6a83fed23c1fd8e3df8589723bc876770dd6a3a as without-grpc-health-probe-bin
+FROM eclipse-temurin:21.0.3_9-jre-alpine@sha256:23467b3e42617ca197f43f58bc5fb03ca4cb059d68acd49c67128bfded132d67
 
 RUN apk add --no-cache ca-certificates
 
+# @TODO: https://github.com/GoogleCloudPlatform/microservices-demo/issues/2517
 # Download Stackdriver Profiler Java agent
-RUN mkdir -p /opt/cprof && \
-    wget -q -O- https://storage.googleapis.com/cloud-profiler/java/latest/profiler_java_agent_alpine.tar.gz \
-    | tar xzv -C /opt/cprof && \
-    rm -rf profiler_java_agent.tar.gz
+# RUN mkdir -p /opt/cprof && \
+#     wget -q -O- https://storage.googleapis.com/cloud-profiler/java/latest/profiler_java_agent_alpine.tar.gz \
+#     | tar xzv -C /opt/cprof && \
+#     rm -rf profiler_java_agent.tar.gz
 
 WORKDIR /app
 COPY --from=builder /app .
 
 EXPOSE 9555
 ENTRYPOINT ["/app/build/install/hipstershop/bin/AdService"]
-
-FROM without-grpc-health-probe-bin
-
-# renovate: datasource=github-releases depName=grpc-ecosystem/grpc-health-probe
-RUN GRPC_HEALTH_PROBE_VERSION=v0.4.14 && \
-    wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-linux-amd64 && \
-    chmod +x /bin/grpc_health_probe

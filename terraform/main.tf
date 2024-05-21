@@ -21,17 +21,13 @@ locals {
     "cloudprofiler.googleapis.com"
   ]
   memorystore_apis = ["redis.googleapis.com"]
-  
-  # Variables cluster_list and cluster_name are used for an implicit dependency
-  # between module "gcloud" and resource "google_container_cluster" 
-  cluster_id_parts = split("/", google_container_cluster.my_cluster.id)
-  cluster_name = element(local.cluster_id_parts, length(local.cluster_id_parts) - 1)
+  cluster_name     = google_container_cluster.my_cluster.name
 }
 
 # Enable Google Cloud APIs
 module "enable_google_apis" {
   source  = "terraform-google-modules/project-factory/google//modules/project_services"
-  version = "~> 14.0"
+  version = "~> 15.0"
 
   project_id                  = var.gcp_project_id
   disable_services_on_destroy = false
@@ -42,6 +38,7 @@ module "enable_google_apis" {
 
 # Create GKE cluster
 resource "google_container_cluster" "my_cluster" {
+
   name     = var.name
   location = var.region
 
@@ -51,6 +48,10 @@ resource "google_container_cluster" "my_cluster" {
   # Setting an empty ip_allocation_policy to allow autopilot cluster to spin up correctly
   ip_allocation_policy {
   }
+
+  # Avoid setting deletion_protection to false
+  # until you're ready (and certain you want) to destroy the cluster.
+  # deletion_protection = false
 
   depends_on = [
     module.enable_google_apis
@@ -66,15 +67,16 @@ module "gcloud" {
   additional_components = ["kubectl", "beta"]
 
   create_cmd_entrypoint = "gcloud"
-  # Use local variable cluster_name for an implicit dependency on resource "google_container_cluster" 
-  create_cmd_body = "container clusters get-credentials ${local.cluster_name} --zone=${var.region}"
+  # Module does not support explicit dependency
+  # Enforce implicit dependency through use of local variable
+  create_cmd_body = "container clusters get-credentials ${local.cluster_name} --zone=${var.region} --project=${var.gcp_project_id}"
 }
 
 # Apply YAML kubernetes-manifest configurations
 resource "null_resource" "apply_deployment" {
   provisioner "local-exec" {
     interpreter = ["bash", "-exc"]
-    command     = "kubectl apply -k ${var.filepath_manifest}"
+    command     = "kubectl apply -k ${var.filepath_manifest} -n ${var.namespace}"
   }
 
   depends_on = [
@@ -86,7 +88,10 @@ resource "null_resource" "apply_deployment" {
 resource "null_resource" "wait_conditions" {
   provisioner "local-exec" {
     interpreter = ["bash", "-exc"]
-    command     = "kubectl wait --for=condition=ready pods --all -n ${var.namespace} --timeout=-1s 2> /dev/null"
+    command     = <<-EOT
+    kubectl wait --for=condition=AVAILABLE apiservice/v1beta1.metrics.k8s.io --timeout=180s
+    kubectl wait --for=condition=ready pods --all -n ${var.namespace} --timeout=280s
+    EOT
   }
 
   depends_on = [

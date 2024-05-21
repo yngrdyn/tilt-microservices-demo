@@ -14,56 +14,7 @@
  * limitations under the License.
  */
 
-if(process.env.DISABLE_PROFILER) {
-  console.log("Profiler disabled.")
-}
-else {
-  console.log("Profiler enabled.")
-  require('@google-cloud/profiler').start({
-    serviceContext: {
-      service: 'currencyservice',
-      version: '1.0.0'
-    }
-  });
-}
-
-
-if(process.env.ENABLE_TRACING == "1") {
-  console.log("Tracing enabled.")
-  const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
-  const { SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
-  const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
-  const { registerInstrumentations } = require('@opentelemetry/instrumentation');
-  const { OTLPTraceExporter } = require("@opentelemetry/exporter-otlp-grpc");
-
-  const provider = new NodeTracerProvider();
-  
-  const collectorUrl = process.env.COLLECTOR_SERVICE_ADDR
-
-  provider.addSpanProcessor(new SimpleSpanProcessor(new OTLPTraceExporter({url: collectorUrl})));
-  provider.register();
-
-  registerInstrumentations({
-    instrumentations: [new GrpcInstrumentation()]
-  });
-}
-else {
-  console.log("Tracing disabled.")
-}
-
-const path = require('path');
-const grpc = require('@grpc/grpc-js');
 const pino = require('pino');
-const protoLoader = require('@grpc/proto-loader');
-
-const MAIN_PROTO_PATH = path.join(__dirname, './proto/demo.proto');
-const HEALTH_PROTO_PATH = path.join(__dirname, './proto/grpc/health/v1/health.proto');
-
-const PORT = process.env.PORT;
-
-const shopProto = _loadProto(MAIN_PROTO_PATH).hipstershop;
-const healthProto = _loadProto(HEALTH_PROTO_PATH).grpc.health.v1;
-
 const logger = pino({
   name: 'currencyservice-server',
   messageKey: 'message',
@@ -73,6 +24,63 @@ const logger = pino({
     }
   }
 });
+
+if(process.env.DISABLE_PROFILER) {
+  logger.info("Profiler disabled.")
+}
+else {
+  logger.info("Profiler enabled.")
+  require('@google-cloud/profiler').start({
+    serviceContext: {
+      service: 'currencyservice',
+      version: '1.0.0'
+    }
+  });
+}
+
+// Register GRPC OTel Instrumentation for trace propagation
+// regardless of whether tracing is emitted.
+const { GrpcInstrumentation } = require('@opentelemetry/instrumentation-grpc');
+const { registerInstrumentations } = require('@opentelemetry/instrumentation');
+
+registerInstrumentations({
+  instrumentations: [new GrpcInstrumentation()]
+});
+
+if(process.env.ENABLE_TRACING == "1") {
+  logger.info("Tracing enabled.")
+  const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node');
+  const { SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+  const { OTLPTraceExporter } = require("@opentelemetry/exporter-otlp-grpc");
+  const { Resource } = require('@opentelemetry/resources');
+  const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
+
+  const provider = new NodeTracerProvider({
+    resource: new Resource({
+      [SemanticResourceAttributes.SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'currencyservice',
+    }),
+  });
+
+  const collectorUrl = process.env.COLLECTOR_SERVICE_ADDR
+
+  provider.addSpanProcessor(new SimpleSpanProcessor(new OTLPTraceExporter({url: collectorUrl})));
+  provider.register();
+}
+else {
+  logger.info("Tracing disabled.")
+}
+
+const path = require('path');
+const grpc = require('@grpc/grpc-js');
+const protoLoader = require('@grpc/proto-loader');
+
+const MAIN_PROTO_PATH = path.join(__dirname, './proto/demo.proto');
+const HEALTH_PROTO_PATH = path.join(__dirname, './proto/grpc/health/v1/health.proto');
+
+const PORT = process.env.PORT;
+
+const shopProto = _loadProto(MAIN_PROTO_PATH).hipstershop;
+const healthProto = _loadProto(HEALTH_PROTO_PATH).grpc.health.v1;
 
 /**
  * Helper function that loads a protobuf file.

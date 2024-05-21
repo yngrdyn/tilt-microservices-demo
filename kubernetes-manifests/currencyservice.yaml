@@ -16,6 +16,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: currencyservice
+  labels:
+    app: currencyservice
 spec:
   selector:
     matchLabels:
@@ -25,7 +27,7 @@ spec:
       labels:
         app: currencyservice
     spec:
-      serviceAccountName: default
+      serviceAccountName: currencyservice
       terminationGracePeriodSeconds: 5
       securityContext:
         fsGroup: 1000
@@ -38,7 +40,7 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
-              - all
+              - ALL
           privileged: false
           readOnlyRootFilesystem: true
         image: currencyservice
@@ -51,11 +53,11 @@ spec:
         - name: DISABLE_PROFILER
           value: "1"
         readinessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:7000"]
+          grpc:
+            port: 7000
         livenessProbe:
-          exec:
-            command: ["/bin/grpc_health_probe", "-addr=:7000"]
+          grpc:
+            port: 7000
         resources:
           requests:
             cpu: 100m
@@ -68,6 +70,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: currencyservice
+  labels:
+    app: currencyservice
 spec:
   type: ClusterIP
   selector:
@@ -76,3 +80,8 @@ spec:
   - name: grpc
     port: 7000
     targetPort: 7000
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: currencyservice

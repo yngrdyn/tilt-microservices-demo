@@ -18,17 +18,19 @@ This page walks you through the steps required to deploy the [Online Boutique](h
 
 ## Prerequisites
 
-1. [Create a new project or use an existing project](https://cloud.google.com/resource-manager/docs/creating-managing-projects#console) on Google Cloud Platform (GCP), and ensure [billing is enabled](https://cloud.google.com/billing/docs/how-to/verify-billing-enabled) on the project.
+1. [Create a new project or use an existing project](https://cloud.google.com/resource-manager/docs/creating-managing-projects#console) on Google Cloud, and ensure [billing is enabled](https://cloud.google.com/billing/docs/how-to/verify-billing-enabled) on the project.
 
 ## Deploy the sample application
 
 1. Clone the Github repository.
-    ```
+
+    ```bash
     git clone https://github.com/GoogleCloudPlatform/microservices-demo.git
     ```
 
 1. Move into the `terraform/` directory which contains the Terraform installation scripts.
-    ```
+
+    ```bash
     cd microservices-demo/terraform
     ```
 
@@ -37,17 +39,20 @@ This page walks you through the steps required to deploy the [Online Boutique](h
 1. (Optional) If you want to provision a [Google Cloud Memorystore (Redis)](https://cloud.google.com/memorystore) instance, you can change the value of `memorystore = false` to `memorystore = true` in this `terraform.tfvars` file.
 
 1. Initialize Terraform.
-    ```
+
+    ```bash
     terraform init
     ```
 
 1. See what resources will be created.
-    ```
+
+    ```bash
     terraform plan
     ```
 
 1. Create the resources and deploy the sample.
-    ```
+
+    ```bash
     terraform apply
     ```
 
@@ -58,7 +63,8 @@ This page walks you through the steps required to deploy the [Online Boutique](h
 Once the Terraform script has finished, you can locate the frontend's external IP address to access the sample application.
 
 - Option 1:
-    ```
+
+    ```bash
     kubectl get service frontend-external | awk '{print $4}'
     ```
 
@@ -72,9 +78,20 @@ To remove the individual resources created for by Terraform without deleting the
 
 1. Navigate to the `terraform/` directory.
 
-1. Run the following command:
-    ```
-    terraform destroy
-    ```
+1. Set `deletion_protection` to `false` for the `google_container_cluster` resource (GKE cluster).
 
-    1. If there is a confirmation prompt, type `yes` and hit Enter/Return.
+   ```bash
+   # Uncomment the line: "deletion_protection = false"
+   sed -i "s/# deletion_protection/deletion_protection/g" main.tf
+
+   # Re-apply the Terraform to update the state
+   terraform apply
+   ```
+
+1. Run the following command:
+
+   ```bash
+   terraform destroy
+   ```
+
+   1. If there is a confirmation prompt, type `yes` and hit Enter/Return.
