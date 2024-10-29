@@ -33,7 +33,6 @@ yamls = [
     './kubernetes-manifests/checkoutservice.yaml',
     './kubernetes-manifests/recommendationservice.yaml',
     './kubernetes-manifests/adservice.yaml',
-    './kubernetes-manifests/redis.yaml',
 ]
 
 # Remove security context and apply Kubernetes manifests
@@ -47,7 +46,8 @@ for yaml in yamls:
 #       for all users automatically
 # Language: Go
 ###
-docker_build_with_restart('frontend', context='./src/frontend',
+docker_build_with_restart('frontend',
+    context='./src/frontend',
     entrypoint='/src/server',
     live_update=[
         sync('./src/frontend', '/src'),

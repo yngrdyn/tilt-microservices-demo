@@ -71,7 +71,10 @@ module.exports = function charge (request) {
 
   // Only VISA and mastercard is accepted, other card types (AMEX, dinersclub) will
   // throw UnacceptedCreditCard error.
-  if (!(cardType === 'visa' || cardType === 'mastercard')) { throw new UnacceptedCreditCard(cardType); }
+  if (!(cardType === 'visa' || cardType === 'mastercard')) { 
+    logger.error(JSON.stringify({"message": {"log.level":"error", "message": "something went wrong"}}));
+    throw new UnacceptedCreditCard(cardType);
+  }
 
   // Also validate expiration is > today.
   const currentMonth = new Date().getMonth() + 1;
